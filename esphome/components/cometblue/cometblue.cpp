@@ -14,7 +14,7 @@ CometBlue* dev;
 
 climate::ClimateTraits CometblueClimate::traits() {
   auto traits = climate::ClimateTraits();
-  traits.set_supports_current_temperature(this->sensor_ != nullptr);
+  traits.set_supports_current_temperature(true);
   traits.set_supports_auto_mode(true);
   traits.set_supports_cool_mode(false);
   traits.set_supports_heat_mode(true);
@@ -26,21 +26,30 @@ climate::ClimateTraits CometblueClimate::traits() {
   return traits;
 }
 
+int CometblueClimate::connect() {
+  if (!dev->isConnected() && !dev->connect(mac_, 0)){
+  	ESP_LOGCONFIG(TAG, "Connect to '%s' FAILED!", this->mac_.c_str());
+	return 0; //why are we void?
+  }
+  ESP_LOGCONFIG(TAG, "Connected to '%s' '%s'", this->mac_.c_str(), dev->getModelNumber().c_str());
+
+  return 1;
+}
+
 void CometblueClimate::setup() {
   ESP_LOGCONFIG(TAG, "Setting up CometBlue client for '%s'...", this->mac_.c_str());
 
   dev = new CometBlue(mac_);
 
-  if (!dev->connect(mac_, 0)){
-  	ESP_LOGCONFIG(TAG, "Connect to '%s' FAILED!", this->mac_.c_str());
-	return; //why are we void?
-  }
-  ESP_LOGCONFIG(TAG, "Connect to '%s' SUCCESS!", this->mac_.c_str());
+  connect();
 
+  update();
+  /*
   Temperatures temp = dev->getTemperatures();
 
   this->current_temperature = temp.current_temp;
   this->publish_state();
+  */
 /*
   if (this->sensor_) {
     this->sensor_->add_on_state_callback([this](float state) {
@@ -63,7 +72,19 @@ void CometblueClimate::setup() {
   */
 }
 
+void CometblueClimate::update() {
+  if (!connect()){
+	  return;
+  }
+
+  Temperatures temp = dev->getTemperatures();
+
+  this->current_temperature = temp.current_temp;
+  this->publish_state();
+}
+
 void CometblueClimate::control(const climate::ClimateCall &call) {
+  update();
 /*
   if (call.get_mode().has_value())
     this->mode = *call.get_mode();
