@@ -28,7 +28,7 @@ climate::ClimateTraits CometblueClimate::traits() {
 }
 
 int CometblueClimate::connect() {
-  if (!dev->isConnected() && !dev->connect(mac_, 0)){
+  if (!dev->isConnected() && !dev->connect(mac_, 0)){ //TODO:pin from config
     ESP_LOGCONFIG(TAG, "Connect to '%s' FAILED!", this->mac_.c_str());
     return 0;
   }
@@ -82,12 +82,14 @@ void CometblueClimate::control(const climate::ClimateCall &call) {
       Temperatures temp = dev->getTemperatures();
       temp.manual_temp = *call.get_target_temperature(); // target temperature in degree Celsius
       ESP_LOGCONFIG(TAG, "About to set target temperature for '%s' to %f", this->mac_.c_str(), temp.manual_temp);
+      //TODO: fix 64deg currrent temp
       if (!dev->setTemperatures(temp)){
         ESP_LOGCONFIG(TAG, "Seting temperature failed!");
       }
     }
   }
 
+  //TODO: do asynchronously?
   update();
 }
 
