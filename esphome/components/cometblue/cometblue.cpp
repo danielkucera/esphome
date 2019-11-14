@@ -69,8 +69,7 @@ void CometblueClimate::update() {
   if (temp.current_temp < temp.manual_temp){
     this->action = climate::CLIMATE_ACTION_HEATING;
   } else {
-//    this->action = climate::CLIMATE_ACTION_IDLE;
-    this->action = climate::CLIMATE_ACTION_OFF;
+    this->action = climate::CLIMATE_ACTION_IDLE;
   }
 
   this->publish_state();
