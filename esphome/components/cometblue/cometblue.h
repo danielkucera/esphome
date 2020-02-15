@@ -24,11 +24,13 @@ class CometblueClimate : public climate::Climate, public Component {
 
   int connect();
   void update();
-  static void update_task(CometblueClimate* parent);
+  static void update_task(void* parm);
 
   bool supports_cool_{true};
   bool supports_heat_{true};
   std::string mac_;
+
+  TaskHandle_t xUpdateTaskHandle = NULL;
 
 };
 

@@ -2,6 +2,8 @@
 #include "esphome/core/log.h"
 #include <CometBlue.h>
 
+SemaphoreHandle_t xSemaphore = xSemaphoreCreateMutex();;
+
 namespace esphome {
 namespace cometblue {
 
@@ -11,6 +13,8 @@ const uint8_t COMETBLUE_TEMP_MAX = 28;  // Celsius
 const uint8_t COMETBLUE_TEMP_MIN = 8;  // Celsius
 
 CometBlue* dev;
+
+BLEClient* bleclient = BLEDevice::createClient();
 
 climate::ClimateTraits CometblueClimate::traits() {
   auto traits = climate::ClimateTraits();
@@ -27,16 +31,6 @@ climate::ClimateTraits CometblueClimate::traits() {
   return traits;
 }
 
-int CometblueClimate::connect() {
-  if (!dev->isConnected() && !dev->connect(mac_, 0)){ //TODO:pin from config
-    ESP_LOGCONFIG(TAG, "Connect to '%s' FAILED!", this->mac_.c_str());
-    return 0;
-  }
-  ESP_LOGCONFIG(TAG, "Connected to '%s' '%s'", this->mac_.c_str(), dev->getModelNumber().c_str());
-
-  return 1;
-}
-
 void CometblueClimate::setup() {
   ESP_LOGCONFIG(TAG, "Setting up CometBlue client for '%s'...", this->mac_.c_str());
 
@@ -47,23 +41,47 @@ void CometblueClimate::setup() {
   //safe to do here?
   esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 
-  dev = new CometBlue(mac_);
-
   //TODO: dynamic interval
   this->set_interval(300*1000, [this] { this->update(); });
 
-  update();
+  dev = new CometBlue(bleclient, mac_);
+
+  //update();
+  xTaskCreatePinnedToCore(
+    &update_task,      // Task function.
+    "CometblueUpdate", // String with name of task.
+    10000,             // Stack size in bytes.
+    this,     // Parameter passed as input of the task
+    1,                 // Priority of the task.
+    &xUpdateTaskHandle,          // Task handle.
+    0                  // Pin to core
+  );
 }
 
-static void CometblueClimate::update_task(CometblueClimate* parent) {
-  parent->update_ext();
+void CometblueClimate::update_task(void* parm) {
+  CometblueClimate* cbc = static_cast<CometblueClimate *>(parm);
+  while (true){
+    if( xSemaphoreTake( xSemaphore, ( TickType_t ) 10 ) == pdTRUE )
+      {
+        cbc->update_ext();
+        xSemaphoreGive(xSemaphore);
+        delay(30*1000);
+      } else {
+        delay(1000);
+      }
+  }
+  //parent->update_ext();
 }
 
 void CometblueClimate::update_ext() {
+  
   ESP_LOGCONFIG(TAG, "Updating state of '%s'...", this->mac_.c_str());
-  if (!this->connect()){
+
+  if (!dev->connect(mac_, 0)){ //TODO:pin from config
+    ESP_LOGCONFIG(TAG, "Connect to '%s' FAILED!", this->mac_.c_str());
     return;
   }
+  ESP_LOGCONFIG(TAG, "Connected to '%s' '%s'", this->mac_.c_str(), dev->getModelNumber().c_str());
 
   Temperatures temp = dev->getTemperatures();
 
@@ -78,33 +96,18 @@ void CometblueClimate::update_ext() {
 
   this->publish_state();
   dev->disconnect();
+
 }
 
 void CometblueClimate::update() {
-//  xTaskCreate(
-  //                  update_task,       /* Task function. */
-    //                "CometblueUpdate", /* String with name of task. */
-      //              10000,             /* Stack size in bytes. */
-        //            (void *)&this,      /* Parameter passed as input of the task */
-          //          1,                 /* Priority of the task. */
-            //        NULL);             /* Task handle. */
-//}
+  // trigger semafore?
+}
 
 void CometblueClimate::control(const climate::ClimateCall &call) {
   if (call.get_target_temperature().has_value()){
-    if (connect()){
-      Temperatures temp = dev->getTemperatures();
-      temp.manual_temp = *call.get_target_temperature(); // target temperature in degree Celsius
-      ESP_LOGCONFIG(TAG, "About to set target temperature for '%s' to %f", this->mac_.c_str(), temp.manual_temp);
-      //TODO: fix 64deg currrent temp
-      if (!dev->setTemperatures(temp)){
-        ESP_LOGCONFIG(TAG, "Seting temperature failed!");
-      }
-    }
+      target_temperature = *call.get_target_temperature(); // target temperature in degree Celsius
+      ESP_LOGCONFIG(TAG, "About to set target temperature for '%s' to %f", this->mac_.c_str(), target_temperature);
   }
-  dev->disconnect();
-
-  //TODO: do asynchronously?
   update();
 }
 
