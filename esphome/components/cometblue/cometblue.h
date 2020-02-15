@@ -10,6 +10,7 @@ namespace cometblue {
 class CometblueClimate : public climate::Climate, public Component {
  public:
   void setup() override;
+  void update_ext();
 
   void set_mac(std::string mac) { mac_ = mac; }
   void set_supports_cool(bool supports_cool) { this->supports_cool_ = supports_cool; }
@@ -23,6 +24,7 @@ class CometblueClimate : public climate::Climate, public Component {
 
   int connect();
   void update();
+  static void update_task(CometblueClimate* parent);
 
   bool supports_cool_{true};
   bool supports_heat_{true};

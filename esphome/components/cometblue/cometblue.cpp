@@ -55,9 +55,13 @@ void CometblueClimate::setup() {
   update();
 }
 
-void CometblueClimate::update() {
+static void CometblueClimate::update_task(CometblueClimate* parent) {
+  parent->update_ext();
+}
+
+void CometblueClimate::update_ext() {
   ESP_LOGCONFIG(TAG, "Updating state of '%s'...", this->mac_.c_str());
-  if (!connect()){
+  if (!this->connect()){
     return;
   }
 
@@ -73,7 +77,18 @@ void CometblueClimate::update() {
   }
 
   this->publish_state();
+  dev->disconnect();
 }
+
+void CometblueClimate::update() {
+//  xTaskCreate(
+  //                  update_task,       /* Task function. */
+    //                "CometblueUpdate", /* String with name of task. */
+      //              10000,             /* Stack size in bytes. */
+        //            (void *)&this,      /* Parameter passed as input of the task */
+          //          1,                 /* Priority of the task. */
+            //        NULL);             /* Task handle. */
+//}
 
 void CometblueClimate::control(const climate::ClimateCall &call) {
   if (call.get_target_temperature().has_value()){
@@ -87,6 +102,7 @@ void CometblueClimate::control(const climate::ClimateCall &call) {
       }
     }
   }
+  dev->disconnect();
 
   //TODO: do asynchronously?
   update();
