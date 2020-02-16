@@ -14,8 +14,6 @@ const uint8_t COMETBLUE_TEMP_MIN = 8;  // Celsius
 
 CometBlue* dev;
 
-BLEClient* bleclient = BLEDevice::createClient();
-
 climate::ClimateTraits CometblueClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.set_supports_current_temperature(true);
@@ -44,7 +42,7 @@ void CometblueClimate::setup() {
   //TODO: dynamic interval
   this->set_interval(300*1000, [this] { this->update(); });
 
-  dev = new CometBlue(bleclient, mac_);
+  dev = new CometBlue(mac_);
 
   //update();
   xTaskCreatePinnedToCore(
